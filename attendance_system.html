@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็คชื่อนักเรียน - โรงเรียนสตรีระนอง</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f0f8ff; /* AliceBlue - ฟ้าอ่อน */
+        }
+        .navbar {
+            background-color: #87CEEB; /* SkyBlue - ฟ้ากลาง */
+        }
+        .nav-button {
+            background-color: #ADD8E6; /* LightBlue - ฟ้าอ่อน */
+            color: #000080; /* Navy - น้ำเงินเข้ม */
+            transition: background-color 0.3s ease;
+        }
+        .nav-button:hover, .nav-button.active {
+            background-color: #000080; /* Navy */
+            color: #FFFFFF; /* White */
+        }
+        .btn-primary {
+            background-color: #87CEEB;
+            color: #000080;
+            transition: background-color 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: #6495ED; /* CornflowerBlue */
+        }
+        .btn-danger {
+            background-color: #FF6347; /* Tomato */
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #CD5C5C; /* IndianRed */
+        }
+        .btn-warning {
+            background-color: #FFD700; /* Gold */
+            color: #333;
+        }
+         .btn-warning:hover {
+            background-color: #FFC107; /* Amber */
+        }
+        .table-header {
+            background-color: #B0E0E6; /* PowderBlue */
+            color: #000080;
+        }
+        .status-present { background-color: #90EE90 !important; /* LightGreen */ color: black !important; }
+        .status-absent { background-color: #F08080 !important; /* LightCoral */ color: white !important; }
+        .status-leave { background-color: #FFFFE0 !important; /* LightYellow */ color: black !important; }
+
+        .status-btn-present { background-color: #28a745; color: white; border-color: #28a745; }
+        .status-btn-absent { background-color: #dc3545; color: white; border-color: #dc3545; }
+        .status-btn-leave { background-color: #ffc107; color: black; border-color: #ffc107; }
+
+        .status-btn-present.selected, .status-btn-present:hover:not(.selected) { background-color: #218838; border-color: #1e7e34;}
+        .status-btn-absent.selected, .status-btn-absent:hover:not(.selected) { background-color: #c82333; border-color: #bd2130;}
+        .status-btn-leave.selected, .status-btn-leave:hover:not(.selected) { background-color: #e0a800; border-color: #d39e00;}
+
+        .page { display: none; }
+        .page.active { display: block; }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0.5) sepia(1) saturate(5) hue-rotate(175deg);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="alertModal" class="modal">
+        <div class="modal-content bg-white shadow-lg rounded-lg p-6">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <p id="modalMessage" class="text-lg"></p>
+            <div id="modalSummary" class="mt-4 text-sm text-left"></div>
+            <button onclick="closeModal()" class="mt-6 btn-primary py-2 px-4 rounded-lg">ตกลง</button>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-blue-700">ระบบบริหารจัดการการเข้าชั้นเรียน</h1>
+            <p class="text-xl text-blue-600">โรงเรียนสตรีระนอง</p>
+            <p class="text-md text-blue-500">ผู้สอน: นายกษิบดินทร์ ศรีหมาด</p>
+            <p id="currentDateTime" class="text-sm text-gray-600 mt-2"></p>
+        </header>
+
+        <nav class="navbar p-4 rounded-lg shadow-md mb-6 flex flex-wrap justify-center gap-2">
+            <button onclick="showPage('attendancePage')" class="nav-button py-2 px-4 rounded-md font-semibold">เช็คชื่อนักเรียน</button>
+            <button onclick="showPage('studentManagementPage')" class="nav-button py-2 px-4 rounded-md font-semibold">จัดการข้อมูลนักเรียน</button>
+            <button onclick="showPage('dailyReportPage')" class="nav-button py-2 px-4 rounded-md font-semibold">รายงานรายวัน</button>
+            <button onclick="showPage('individualReportPage')" class="nav-button py-2 px-4 rounded-md font-semibold">รายงานรายบุคคล</button>
+            <button onclick="showPage('classComparisonPage')" class="nav-button py-2 px-4 rounded-md font-semibold">เปรียบเทียบภาพรวมห้อง</button>
+        </nav>
+
+        <div id="attendancePage" class="page bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">เช็คชื่อนักเรียน</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label for="attSubject" class="block text-sm font-medium text-gray-700">รายวิชา:</label>
+                    <select id="attSubject" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="attGrade" class="block text-sm font-medium text-gray-700">ระดับชั้น:</label>
+                    <select id="attGrade" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="attClass" class="block text-sm font-medium text-gray-700">ห้อง:</label>
+                    <select id="attClass" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="attDate" class="block text-sm font-medium text-gray-700">วันที่:</label>
+                    <input type="date" id="attDate" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+            </div>
+            <button onclick="loadStudentsForAttendance()" class="btn-primary py-2 px-4 rounded-md mb-4">แสดงรายชื่อนักเรียน</button>
+
+            <div class="mb-4 flex gap-2">
+                <button onclick="markAll('มาเรียน')" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">มาเรียนทั้งหมด</button>
+                <button onclick="markAll('ไม่มาเรียน')" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">ไม่มาเรียนทั้งหมด</button>
+                <button onclick="markAll('ลา')" class="bg-yellow-500 hover:bg-yellow-700 text-black font-bold py-2 px-4 rounded">ลาทั้งหมด</button>
+                <button onclick="clearAllStatuses()" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">ยกเลิกทั้งหมด</button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="table-header">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ลำดับ</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ชื่อ-นามสกุล</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">สถานะ</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">หมายเหตุพฤติกรรม</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+            <button onclick="saveAttendance()" class="mt-6 btn-primary font-semibold py-2 px-6 rounded-md">บันทึกการเช็คชื่อ</button>
+        </div>
+
+        <div id="studentManagementPage" class="page bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">จัดการข้อมูลนักเรียน</h2>
+            
+            <div class="mb-6 p-4 border border-blue-200 rounded-lg">
+                <h3 class="text-xl font-semibold mb-2 text-blue-600">เพิ่มนักเรียนรายบุคคล</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="smFirstName" class="block text-sm font-medium text-gray-700">ชื่อ:</label>
+                        <input type="text" id="smFirstName" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="smLastName" class="block text-sm font-medium text-gray-700">นามสกุล:</label>
+                        <input type="text" id="smLastName" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="smGrade" class="block text-sm font-medium text-gray-700">ระดับชั้น:</label>
+                        <select id="smGrade" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </select>
+                    </div>
+                    <div>
+                        <label for="smClass" class="block text-sm font-medium text-gray-700">ห้อง:</label>
+                        <select id="smClass" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            </select>
+                    </div>
+                </div>
+                <input type="hidden" id="smStudentId"> <button onclick="addOrUpdateStudent()" class="mt-4 btn-primary py-2 px-4 rounded-md">เพิ่ม/อัปเดตนักเรียน</button>
+                <button onclick="clearStudentForm()" class="mt-4 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded-md">ล้างฟอร์ม</button>
+            </div>
+
+            <div class="mb-6 p-4 border border-blue-200 rounded-lg">
+                <h3 class="text-xl font-semibold mb-2 text-blue-600">เพิ่มนักเรียนจากไฟล์ Excel</h3>
+                <input type="file" id="excelFile" accept=".xlsx, .xls" class="block w-full text-sm text-slate-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-full file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100 mb-2
+                "/>
+                <p class="text-xs text-gray-500 mb-2">รูปแบบไฟล์: คอลัมน์ A: ชื่อ, B: นามสกุล, C: ระดับชั้น (เช่น ม.1), D: ห้อง (เช่น 1)</p>
+                <button onclick="importStudentsFromExcel()" class="btn-primary py-2 px-4 rounded-md">นำเข้าจาก Excel</button>
+            </div>
+
+            <h3 class="text-xl font-semibold mb-2 text-blue-600">รายชื่อนักเรียนในระบบ</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="table-header">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ชื่อ-นามสกุล</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ระดับชั้น</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">ห้อง</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">การดำเนินการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentListTableBody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="dailyReportPage" class="page bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">รายงานการเข้าเรียนรายวัน</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <label for="drDate" class="block text-sm font-medium text-gray-700">วันที่:</label>
+                    <input type="date" id="drDate" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                 <div>
+                    <label for="drSubject" class="block text-sm font-medium text-gray-700">รายวิชา:</label>
+                    <select id="drSubject" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="drGrade" class="block text-sm font-medium text-gray-700">ระดับชั้น:</label>
+                    <select id="drGrade" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="drClass" class="block text-sm font-medium text-gray-700">ห้อง:</label>
+                    <select id="drClass" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+            </div>
+            <button onclick="generateDailyReport()" class="btn-primary py-2 px-4 rounded-md mb-4">แสดงรายงาน</button>
+            <div id="dailyReportContent" class="mt-4"> <h3 id="dailyReportHeader" class="text-xl font-semibold text-blue-600 mb-2"></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="dailyReportTableContainer" class="overflow-x-auto">
+                        </div>
+                    <div id="dailyAttendanceChartContainer" class="flex justify-center items-center">
+                        <canvas id="dailyAttendanceChart" width="300" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="individualReportPage" class="page bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">รายงานการเข้าเรียนรายบุคคล</h2>
+             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label for="irStudent" class="block text-sm font-medium text-gray-700">เลือกนักเรียน:</label>
+                    <select id="irStudent" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="irStartDate" class="block text-sm font-medium text-gray-700">ตั้งแต่วันที่:</label>
+                    <input type="date" id="irStartDate" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="irEndDate" class="block text-sm font-medium text-gray-700">ถึงวันที่:</label>
+                    <input type="date" id="irEndDate" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm">
+                </div>
+            </div>
+            <button onclick="generateIndividualReport()" class="btn-primary py-2 px-4 rounded-md mb-4">แสดงรายงาน</button>
+            <div id="individualReportContent" class="mt-4">
+                </div>
+        </div>
+
+        <div id="classComparisonPage" class="page bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-700">เปรียบเทียบเปอร์เซ็นต์การเข้าเรียนภาพรวม</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label for="ccGrade" class="block text-sm font-medium text-gray-700">ระดับชั้น:</label>
+                    <select id="ccGrade" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </select>
+                </div>
+                <div>
+                    <label for="ccStartDate" class="block text-sm font-medium text-gray-700">ตั้งแต่วันที่:</label>
+                    <input type="date" id="ccStartDate" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="ccEndDate" class="block text-sm font-medium text-gray-700">ถึงวันที่:</label>
+                    <input type="date" id="ccEndDate" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm">
+                </div>
+            </div>
+            <button onclick="generateClassComparisonReport()" class="btn-primary py-2 px-4 rounded-md mb-4">แสดงรายงานเปรียบเทียบ</button>
+            
+            <div id="classComparisonReportDisplayArea" class="mt-4"> 
+                <h3 id="classComparisonReportHeader" class="text-xl font-semibold text-blue-600 mb-2"></h3>
+                <div id="classComparisonTableContainer" class="overflow-x-auto mt-4">
+                    </div>
+                <div id="classComparisonChartContainer" class="flex justify-center items-center mt-4">
+                    <canvas id="classComparisonChart" width="600" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const subjects = [
+            "ฟิสิกส์ 1", "ฟิสิกส์ 3", "วิทยาศาสตร์โลกทั้งระบบ", "วิทยาศาสตร์พลังสิบ",
+            "IS", "โลกดาราศาสตร์และอวกาศ", "วิทยาศาสตร์กายภาพ 2"
+        ];
+        const grades = ["ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6"];
+        const classes = Array.from({ length: 10 }, (_, i) => (i + 1).toString());
+
+        // --- Database (localStorage) ---
+        let students = JSON.parse(localStorage.getItem('students')) || [];
+        let attendanceRecords = JSON.parse(localStorage.getItem('attendanceRecords')) || [];
+        let dailyAttendanceChartInstance = null;
+        let classComparisonChartInstance = null;
+
+
+        // --- Utility Functions ---
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function showModal(message, summaryHtml = '') {
+            document.getElementById('modalMessage').textContent = message;
+            document.getElementById('modalSummary').innerHTML = summaryHtml;
+            document.getElementById('alertModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('alertModal').style.display = 'none';
+        }
+
+        function updateCurrentDateTime() {
+            const now = new Date();
+            const thaiDateTime = now.toLocaleString('th-TH', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+            document.getElementById('currentDateTime').textContent = thaiDateTime;
+        }
+        setInterval(updateCurrentDateTime, 1000);
+
+
+        // --- Page Navigation ---
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            
+            document.querySelectorAll('.nav-button').forEach(button => button.classList.remove('active'));
+            const activeButton = Array.from(document.querySelectorAll('.nav-button')).find(btn => btn.getAttribute('onclick').includes(pageId));
+            if (activeButton) activeButton.classList.add('active');
+
+            if (pageId === 'studentManagementPage') loadStudentListTable();
+            if (pageId === 'individualReportPage') populateIrStudentDropdown();
+            if (pageId === 'dailyReportPage') {
+                document.getElementById('drDate').valueAsDate = new Date();
+            }
+        }
+
+        // --- Populate Dropdowns ---
+        function populateDropdown(selectId, optionsArray, defaultOptionText = "กรุณาเลือก") {
+            const select = document.getElementById(selectId);
+            select.innerHTML = `<option value="">${defaultOptionText}</option>`;
+            optionsArray.forEach(option => {
+                const optElement = document.createElement('option');
+                optElement.value = option;
+                optElement.textContent = option;
+                select.appendChild(optElement);
+            });
+        }
+
+        function populateGradeAndClassDropdowns(gradeSelectId, classSelectId) {
+            populateDropdown(gradeSelectId, grades, "เลือกระดับชั้น");
+            populateDropdown(classSelectId, classes, "เลือกห้อง");
+        }
+        
+        function populateAllCommonDropdowns() {
+            populateDropdown('attSubject', subjects, "เลือกรายวิชา");
+            populateGradeAndClassDropdowns('attGrade', 'attClass');
+            populateGradeAndClassDropdowns('smGrade', 'smClass');
+            
+            populateDropdown('drSubject', subjects, "เลือกรายวิชา (ทั้งหมด)");
+            populateGradeAndClassDropdowns('drGrade', 'drClass');
+            document.getElementById('drGrade').innerHTML = '<option value="">ทุกระดับชั้น</option>' + grades.map(g => `<option value="${g}">${g}</option>`).join('');
+            document.getElementById('drClass').innerHTML = '<option value="">ทุกห้อง</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+
+
+            // Corrected ccGrade population to be just grades, not grade and class
+            populateDropdown('ccGrade', grades, "ทุกระดับชั้น"); 
+        }
+
+
+        // --- Attendance Page ---
+        function loadStudentsForAttendance() {
+            const selectedGrade = document.getElementById('attGrade').value;
+            const selectedClass = document.getElementById('attClass').value;
+            const selectedDate = document.getElementById('attDate').value;
+            const selectedSubject = document.getElementById('attSubject').value;
+
+            if (!selectedGrade || !selectedClass || !selectedDate || !selectedSubject) {
+                showModal("กรุณาเลือกข้อมูลให้ครบ: รายวิชา, ระดับชั้น, ห้อง และวันที่");
+                return;
+            }
+
+            const filteredStudents = students.filter(s => s.grade === selectedGrade && s.room === selectedClass);
+            const tbody = document.getElementById('attendanceTableBody');
+            tbody.innerHTML = ''; // Clear previous list
+
+            if (filteredStudents.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4">ไม่พบนักเรียนในชั้น ${selectedGrade}/${selectedClass}</td></tr>`;
+                return;
+            }
+            
+            filteredStudents.sort((a, b) => (a.firstName + ' ' + a.lastName).localeCompare(b.firstName + ' ' + b.lastName, 'th'));
+
+
+            filteredStudents.forEach((student, index) => {
+                const row = tbody.insertRow();
+                row.dataset.studentId = student.id;
+
+                row.insertCell().textContent = index + 1;
+                row.insertCell().textContent = `${student.firstName} ${student.lastName}`;
+                
+                const statusCell = row.insertCell();
+                statusCell.classList.add('space-x-1');
+                const statuses = ["มาเรียน", "ไม่มาเรียน", "ลา"];
+                const statusColors = { "มาเรียน": "status-btn-present", "ไม่มาเรียน": "status-btn-absent", "ลา": "status-btn-leave" };
+                
+                statuses.forEach(status => {
+                    const button = document.createElement('button');
+                    button.textContent = status;
+                    button.classList.add('px-2', 'py-1', 'text-xs', 'rounded', 'border', statusColors[status]);
+                    button.onclick = () => {
+                        Array.from(statusCell.children).forEach(btn => btn.classList.remove('selected', 'ring-2', 'ring-offset-1', 'ring-blue-500'));
+                        button.classList.add('selected', 'ring-2', 'ring-offset-1', 'ring-blue-500');
+                        row.className = ''; 
+                        if (status === "มาเรียน") row.classList.add('status-present');
+                        else if (status === "ไม่มาเรียน") row.classList.add('status-absent');
+                        else if (status === "ลา") row.classList.add('status-leave');
+                        row.dataset.status = status;
+                    };
+                    statusCell.appendChild(button);
+                });
+
+                const existingRecord = attendanceRecords.find(r => 
+                    r.studentId === student.id && 
+                    r.date === selectedDate && 
+                    r.subject === selectedSubject
+                );
+
+                const notesInput = row.insertCell().appendChild(document.createElement('input'));
+                notesInput.type = 'text';
+                notesInput.placeholder = 'บันทึกพฤติกรรม...';
+                notesInput.classList.add('w-full', 'py-1', 'px-2', 'border', 'border-gray-300', 'rounded-md');
+
+                if (existingRecord) {
+                    row.dataset.status = existingRecord.status;
+                    const existingButton = Array.from(statusCell.children).find(btn => btn.textContent === existingRecord.status);
+                    if (existingButton) {
+                         existingButton.classList.add('selected', 'ring-2', 'ring-offset-1', 'ring-blue-500');
+                         if (existingRecord.status === "มาเรียน") row.classList.add('status-present');
+                         else if (existingRecord.status === "ไม่มาเรียน") row.classList.add('status-absent');
+                         else if (existingRecord.status === "ลา") row.classList.add('status-leave');
+                    }
+                    notesInput.value = existingRecord.notes || '';
+                }
+            });
+        }
+        
+        function markAll(statusToSet) {
+            const rows = document.querySelectorAll('#attendanceTableBody tr');
+            rows.forEach(row => {
+                if (row.cells.length < 3 || !row.dataset.studentId) return; 
+                const statusCell = row.cells[2];
+                const buttons = Array.from(statusCell.children);
+                buttons.forEach(btn => btn.classList.remove('selected', 'ring-2', 'ring-offset-1', 'ring-blue-500'));
+                
+                const targetButton = buttons.find(btn => btn.textContent === statusToSet);
+                if (targetButton) {
+                    targetButton.classList.add('selected', 'ring-2', 'ring-offset-1', 'ring-blue-500');
+                }
+                
+                row.className = ''; 
+                if (statusToSet === "มาเรียน") row.classList.add('status-present');
+                else if (statusToSet === "ไม่มาเรียน") row.classList.add('status-absent');
+                else if (statusToSet === "ลา") row.classList.add('status-leave');
+                row.dataset.status = statusToSet;
+            });
+        }
+
+        function clearAllStatuses() {
+            const rows = document.querySelectorAll('#attendanceTableBody tr');
+            rows.forEach(row => {
+                 if (row.cells.length < 3 || !row.dataset.studentId) return;
+                const statusCell = row.cells[2];
+                Array.from(statusCell.children).forEach(btn => btn.classList.remove('selected', 'ring-2', 'ring-offset-1', 'ring-blue-500'));
+                row.className = '';
+                delete row.dataset.status;
+            });
+        }
+
+
+        function saveAttendance() {
+            const subject = document.getElementById('attSubject').value;
+            const date = document.getElementById('attDate').value;
+            const grade = document.getElementById('attGrade').value;
+            const room = document.getElementById('attClass').value;
+
+            if (!subject || !date || !grade || !room) {
+                showModal("กรุณาเลือกข้อมูลรายวิชา, วันที่, ระดับชั้น และห้องให้ครบถ้วนก่อนบันทึก");
+                return;
+            }
+
+            const rows = document.querySelectorAll('#attendanceTableBody tr');
+            let recordsToSave = [];
+            let presentCount = 0;
+            let absentCount = 0;
+            let leaveCount = 0;
+            let totalStudentsInClass = 0;
+            let unselectedStudents = 0;
+
+            rows.forEach(row => {
+                if (!row.dataset.studentId) return; 
+                totalStudentsInClass++;
+                const studentId = row.dataset.studentId;
+                const status = row.dataset.status;
+                const notesInput = row.cells[3].querySelector('input');
+                const notes = notesInput ? notesInput.value : '';
+
+                if (!status) {
+                    unselectedStudents++;
+                    return; 
+                }
+
+                attendanceRecords = attendanceRecords.filter(r => 
+                    !(r.studentId === studentId && r.date === date && r.subject === subject)
+                );
+                
+                const record = {
+                    id: generateUUID(),
+                    studentId: studentId,
+                    subject: subject,
+                    date: date,
+                    status: status,
+                    notes: notes,
+                    timestamp: new Date().toISOString()
+                };
+                recordsToSave.push(record);
+
+                if (status === "มาเรียน") presentCount++;
+                else if (status === "ไม่มาเรียน") absentCount++;
+                else if (status === "ลา") leaveCount++;
+            });
+            
+            if (totalStudentsInClass === 0) {
+                 showModal("ไม่พบรายชื่อนักเรียนให้เช็ค กรุณาเลือกชั้นเรียนและกด 'แสดงรายชื่อนักเรียน' ก่อน");
+                return;
+            }
+            if (unselectedStudents > 0 && recordsToSave.length === 0) {
+                 showModal(`ยังไม่ได้เลือกสถานะให้นักเรียน ${unselectedStudents} คน กรุณาเลือกสถานะก่อนบันทึก`);
+                return;
+            }
+             if (unselectedStudents > 0 && recordsToSave.length > 0) {
+                if (!confirm(`มีนักเรียน ${unselectedStudents} คนที่ยังไม่ได้เลือกสถานะ ต้องการบันทึกเฉพาะนักเรียนที่เลือกสถานะแล้วหรือไม่?`)) {
+                    return;
+                }
+            }
+
+
+            attendanceRecords.push(...recordsToSave);
+            localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+            
+            const totalChecked = presentCount + absentCount + leaveCount;
+            const attendancePercentage = totalChecked > 0 ? ((presentCount / totalChecked) * 100).toFixed(2) : "0.00";
+            
+            const uniqueDaysCheckedForSubject = new Set(
+                attendanceRecords
+                    .filter(r => {
+                        const studentData = students.find(s => s.id === r.studentId);
+                        return studentData && r.subject === subject && studentData.grade === grade && studentData.room === room;
+                     })
+                    .map(r => r.date)
+            ).size;
+
+            let summaryHtml = `
+                <p><strong>รายวิชา:</strong> ${subject}</p>
+                <p><strong>ชั้น/ห้อง:</strong> ${grade}/${room}</p>
+                <p><strong>วันที่:</strong> ${new Date(date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p><strong>เวลาบันทึก:</strong> ${new Date().toLocaleTimeString('th-TH')}</p>
+                <hr class="my-2">
+                <p><strong>นักเรียนทั้งหมดในห้องนี้:</strong> ${totalStudentsInClass} คน</p>
+                <p><strong>บันทึกสถานะแล้ว:</strong> ${totalChecked} คน</p>
+                <p class="text-green-600"><strong>มาเรียน:</strong> ${presentCount} คน</p>
+                <p class="text-red-600"><strong>ไม่มาเรียน:</strong> ${absentCount} คน</p>
+                <p class="text-yellow-600"><strong>ลา:</strong> ${leaveCount} คน</p>
+                <p><strong>เปอร์เซ็นต์การมาเรียน (คาบนี้ จากที่บันทึก):</strong> ${attendancePercentage}%</p>
+                <hr class="my-2">
+                <p><strong>รวมมีการเช็คชื่อวิชา ${subject} ของห้อง ${grade}/${room} ไปแล้ว:</strong> ${uniqueDaysCheckedForSubject} วัน</p>
+            `;
+
+            showModal("บันทึกข้อมูลการเช็คชื่อเรียบร้อย!", summaryHtml);
+        }
+
+        // --- Student Management Page ---
+        function addOrUpdateStudent() {
+            const id = document.getElementById('smStudentId').value;
+            const firstName = document.getElementById('smFirstName').value.trim();
+            const lastName = document.getElementById('smLastName').value.trim();
+            const grade = document.getElementById('smGrade').value;
+            const room = document.getElementById('smClass').value;
+
+            if (!firstName || !lastName || !grade || !room) {
+                showModal("กรุณากรอกข้อมูลนักเรียนให้ครบถ้วน");
+                return;
+            }
+
+            if (id) { 
+                const studentIndex = students.findIndex(s => s.id === id);
+                if (studentIndex > -1) {
+                    students[studentIndex] = { ...students[studentIndex], firstName, lastName, grade, room };
+                }
+            } else { 
+                students.push({ id: generateUUID(), firstName, lastName, grade, room });
+            }
+            localStorage.setItem('students', JSON.stringify(students));
+            loadStudentListTable();
+            clearStudentForm();
+            showModal(id ? "อัปเดตข้อมูลนักเรียนเรียบร้อย" : "เพิ่มนักเรียนใหม่เรียบร้อย");
+        }
+
+        function clearStudentForm() {
+            document.getElementById('smStudentId').value = '';
+            document.getElementById('smFirstName').value = '';
+            document.getElementById('smLastName').value = '';
+            document.getElementById('smGrade').value = '';
+            document.getElementById('smClass').value = '';
+        }
+
+        function loadStudentListTable() {
+            const tbody = document.getElementById('studentListTableBody');
+            tbody.innerHTML = '';
+            
+            const sortedStudents = [...students].sort((a, b) => {
+                if (a.grade < b.grade) return -1;
+                if (a.grade > b.grade) return 1;
+                if (a.room < b.room) return -1; // Sort by room number correctly
+                if (a.room > b.room) return 1;
+                return (a.firstName + ' ' + a.lastName).localeCompare(b.firstName + ' ' + b.lastName, 'th');
+            });
+
+
+            sortedStudents.forEach(student => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = `${student.firstName} ${student.lastName}`;
+                row.insertCell().textContent = student.grade;
+                row.insertCell().textContent = student.room;
+                
+                const actionsCell = row.insertCell();
+                actionsCell.classList.add('space-x-2');
+                const editButton = document.createElement('button');
+                editButton.innerHTML = '<i class="fas fa-edit"></i> แก้ไข';
+                editButton.classList.add('btn-primary', 'text-xs', 'py-1', 'px-2', 'rounded');
+                editButton.onclick = () => editStudent(student.id);
+                actionsCell.appendChild(editButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.innerHTML = '<i class="fas fa-trash"></i> ลบ';
+                deleteButton.classList.add('btn-danger', 'text-xs', 'py-1', 'px-2', 'rounded');
+                deleteButton.onclick = () => deleteStudent(student.id);
+                actionsCell.appendChild(deleteButton);
+            });
+        }
+
+        function editStudent(id) {
+            const student = students.find(s => s.id === id);
+            if (student) {
+                document.getElementById('smStudentId').value = student.id;
+                document.getElementById('smFirstName').value = student.firstName;
+                document.getElementById('smLastName').value = student.lastName;
+                document.getElementById('smGrade').value = student.grade;
+                document.getElementById('smClass').value = student.room;
+                document.getElementById('smFirstName').focus(); // Focus on the first field
+            }
+        }
+
+        function deleteStudent(id) {
+            if (confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักเรียนคนนี้? การดำเนินการนี้จะลบข้อมูลการเช็คชื่อของนักเรียนคนนี้ทั้งหมดด้วย")) {
+                students = students.filter(s => s.id !== id);
+                attendanceRecords = attendanceRecords.filter(r => r.studentId !== id);
+                
+                localStorage.setItem('students', JSON.stringify(students));
+                localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
+                loadStudentListTable();
+                showModal("ลบข้อมูลนักเรียนเรียบร้อย");
+            }
+        }
+
+        function importStudentsFromExcel() {
+            const fileInput = document.getElementById('excelFile');
+            if (fileInput.files.length === 0) {
+                showModal("กรุณาเลือกไฟล์ Excel ก่อน");
+                return;
+            }
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header:1}); 
+
+                    if (jsonData.length < 1) { 
+                        showModal("ไฟล์ Excel ไม่มีข้อมูล หรือรูปแบบไม่ถูกต้อง");
+                        return;
+                    }
+                    
+                    let newStudentsCount = 0;
+                    // Skip header row by starting from index 1 if header:1 is used, or 0 if header is not specified and first row is data
+                    const dataRows = jsonData.slice(jsonData[0].includes("ชื่อ") ? 1 : 0);
+
+
+                    dataRows.forEach(row => { 
+                        const firstName = row[0] ? String(row[0]).trim() : '';
+                        const lastName = row[1] ? String(row[1]).trim() : '';
+                        const grade = row[2] ? String(row[2]).trim() : '';
+                        const room = row[3] ? String(row[3]).trim() : '';
+
+                        if (firstName && lastName && grade && room && grades.includes(grade) && classes.includes(String(room))) {
+                            const exists = students.some(s => s.firstName === firstName && s.lastName === lastName && s.grade === grade && s.room === room);
+                            if (!exists) {
+                                students.push({ id: generateUUID(), firstName, lastName, grade, room });
+                                newStudentsCount++;
+                            }
+                        } else {
+                            console.warn("ข้ามแถวข้อมูลที่ไม่สมบูรณ์หรือไม่ถูกต้องจาก Excel:", row);
+                        }
+                    });
+
+                    if (newStudentsCount > 0) {
+                        localStorage.setItem('students', JSON.stringify(students));
+                        loadStudentListTable();
+                        showModal(`นำเข้าข้อมูลนักเรียน ${newStudentsCount} คน สำเร็จ`);
+                    } else {
+                        showModal("ไม่พบข้อมูลนักเรียนใหม่ที่สามารถนำเข้าได้ หรือนักเรียนอาจมีอยู่แล้วในระบบ หรือรูปแบบไฟล์ไม่ถูกต้อง");
+                    }
+                } catch (e) {
+                    console.error("Error processing Excel file:", e);
+                    showModal("เกิดข้อผิดพลาดในการประมวลผลไฟล์ Excel: " + e.message);
+                } finally {
+                     fileInput.value = ''; 
+                }
+            };
+            reader.onerror = function() {
+                showModal("เกิดข้อผิดพลาดในการอ่านไฟล์");
+                fileInput.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+
+        // --- Daily Report Page ---
+        function generateDailyReport() {
+            const date = document.getElementById('drDate').value;
+            const subjectFilter = document.getElementById('drSubject').value;
+            const gradeFilter = document.getElementById('drGrade').value;
+            const classFilter = document.getElementById('drClass').value;
+            
+            const reportContentDiv = document.getElementById('dailyReportContent');
+            const reportTableContainer = document.getElementById('dailyReportTableContainer');
+            const reportHeader = document.getElementById('dailyReportHeader');
+            const dailyChartContainer = document.getElementById('dailyAttendanceChartContainer');
+
+            if (!reportContentDiv || !reportTableContainer || !reportHeader || !dailyChartContainer) {
+                console.error("Daily report elements missing:", {reportContentDiv, reportTableContainer, reportHeader, dailyChartContainer});
+                showModal("ข้อผิดพลาด: ไม่สามารถโหลดองค์ประกอบหน้ารายงานรายวันได้");
+                return;
+            }
+
+            if (!date) {
+                showModal("กรุณาเลือกวันที่สำหรับรายงาน");
+                reportContentDiv.style.display = 'none'; 
+                return;
+            }
+            reportContentDiv.style.display = 'block';
+
+            let filteredRecords = attendanceRecords.filter(r => r.date === date);
+
+            if (subjectFilter) {
+                filteredRecords = filteredRecords.filter(r => r.subject === subjectFilter);
+            }
+            
+            let studentsForReport = [];
+            if (gradeFilter && classFilter) {
+                 studentsForReport = students.filter(s => s.grade === gradeFilter && s.room === classFilter);
+            } else if (gradeFilter) {
+                 studentsForReport = students.filter(s => s.grade === gradeFilter);
+            } else { 
+                 const studentIdsInFilteredRecords = new Set(filteredRecords.map(r => r.studentId));
+                 studentsForReport = students.filter(s => studentIdsInFilteredRecords.has(s.id));
+            }
+            
+            filteredRecords = filteredRecords.filter(r => studentsForReport.some(s => s.id === r.studentId));
+
+
+            let reportTitle = `รายงานการเข้าเรียนวันที่ ${new Date(date).toLocaleDateString('th-TH', {day: 'numeric', month: 'long', year: 'numeric'})}`;
+            if (subjectFilter) reportTitle += ` วิชา: ${subjectFilter}`;
+            if (gradeFilter) reportTitle += ` ชั้น: ${gradeFilter}`;
+            if (classFilter && gradeFilter) reportTitle += `/${classFilter}`; // Only add class if grade is also selected
+            reportHeader.textContent = reportTitle;
+
+            if (filteredRecords.length === 0) {
+                reportTableContainer.innerHTML = '<p class="text-center text-gray-500">ไม่พบข้อมูลการเช็คชื่อสำหรับวันที่และตัวกรองที่เลือก</p>';
+                if (dailyAttendanceChartInstance) {
+                    dailyAttendanceChartInstance.destroy();
+                    dailyAttendanceChartInstance = null; 
+                }
+                dailyChartContainer.style.display = 'none'; 
+                return;
+            }
+            dailyChartContainer.style.display = 'flex'; 
+
+            let tableHtml = `<table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="table-header">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">ชื่อ-นามสกุล</th>
+                                        <th class="px-3 py-2 text-left">ชั้น/ห้อง</th>
+                                        <th class="px-3 py-2 text-left">วิชา</th>
+                                        <th class="px-3 py-2 text-left">สถานะ</th>
+                                        <th class="px-3 py-2 text-left">หมายเหตุ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+            
+            const stats = { "มาเรียน": 0, "ไม่มาเรียน": 0, "ลา": 0 };
+
+            const recordsWithStudentInfo = filteredRecords.map(record => {
+                const student = students.find(s => s.id === record.studentId);
+                return { ...record, studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A', studentGrade: student ? student.grade : 'N/A', studentRoom: student ? student.room : 'N/A' };
+            }).sort((a,b) => a.studentName.localeCompare(b.studentName, 'th'));
+
+
+            recordsWithStudentInfo.forEach(record => {
+                stats[record.status]++;
+                let statusClass = '';
+                if (record.status === "มาเรียน") statusClass = 'text-green-600 font-semibold';
+                else if (record.status === "ไม่มาเรียน") statusClass = 'text-red-600 font-semibold';
+                else if (record.status === "ลา") statusClass = 'text-yellow-600 font-semibold';
+
+                tableHtml += `<tr>
+                                <td class="px-3 py-2">${record.studentName}</td>
+                                <td class="px-3 py-2">${record.studentGrade}/${record.studentRoom}</td>
+                                <td class="px-3 py-2">${record.subject}</td>
+                                <td class="px-3 py-2 ${statusClass}">${record.status}</td>
+                                <td class="px-3 py-2">${record.notes || '-'}</td>
+                              </tr>`;
+            });
+            tableHtml += `</tbody></table>`;
+            reportTableContainer.innerHTML = tableHtml;
+
+            if (dailyAttendanceChartInstance) {
+                dailyAttendanceChartInstance.destroy();
+            }
+            const ctx = document.getElementById('dailyAttendanceChart').getContext('2d');
+            dailyAttendanceChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['มาเรียน', 'ไม่มาเรียน', 'ลา'],
+                    datasets: [{
+                        label: 'สถิติการเข้าเรียน',
+                        data: [stats['มาเรียน'], stats['ไม่มาเรียน'], stats['ลา']],
+                        backgroundColor: ['#90EE90', '#F08080', '#FFFFE0'],
+                        borderColor: ['#28a745', '#dc3545', '#ffc107'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `สรุปการเข้าเรียน ${gradeFilter && classFilter ? `ห้อง ${gradeFilter}/${classFilter}` : (gradeFilter ? `ชั้น ${gradeFilter}` : '')}`
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Individual Report Page ---
+        function populateIrStudentDropdown() {
+            const select = document.getElementById('irStudent');
+            select.innerHTML = '<option value="">-- เลือกนักเรียน --</option>';
+            const sortedStudents = [...students].sort((a,b) => (a.firstName + ' ' + a.lastName).localeCompare(b.firstName + ' ' + b.lastName, 'th'));
+            sortedStudents.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = `${student.firstName} ${student.lastName} (ชั้น ${student.grade}/${student.room})`;
+                select.appendChild(option);
+            });
+        }
+
+        function generateIndividualReport() {
+            const studentId = document.getElementById('irStudent').value;
+            const startDate = document.getElementById('irStartDate').value;
+            const endDate = document.getElementById('irEndDate').value;
+            const reportContent = document.getElementById('individualReportContent');
+
+            if (!studentId) {
+                showModal("กรุณาเลือกนักเรียน");
+                reportContent.innerHTML = ''; // Clear previous report
+                return;
+            }
+            const student = students.find(s => s.id === studentId);
+            if (!student) {
+                 showModal("ไม่พบข้อมูลนักเรียน");
+                 reportContent.innerHTML = '';
+                return;
+            }
+
+            let studentRecords = attendanceRecords.filter(r => r.studentId === studentId);
+            if (startDate) studentRecords = studentRecords.filter(r => r.date >= startDate);
+            if (endDate) studentRecords = studentRecords.filter(r => r.date <= endDate);
+            
+            studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date) || a.subject.localeCompare(b.subject));
+
+
+            let contentHtml = `<h3 class="text-xl font-semibold text-blue-600 mb-2">รายงานการเข้าเรียนของ: ${student.firstName} ${student.lastName} (ชั้น ${student.grade}/${student.room})</h3>`;
+            if (startDate || endDate) {
+                 contentHtml += `<p class="text-sm text-gray-600 mb-2">ช่วงวันที่: ${startDate ? new Date(startDate).toLocaleDateString('th-TH') : 'เริ่มต้น'} - ${endDate ? new Date(endDate).toLocaleDateString('th-TH') : 'ปัจจุบัน'}</p>`;
+            }
+
+
+            if (studentRecords.length === 0) {
+                contentHtml += '<p class="text-center text-gray-500 mt-4">ไม่พบข้อมูลการเช็คชื่อสำหรับนักเรียนนี้ในช่วงวันที่ที่เลือก</p>';
+                reportContent.innerHTML = contentHtml;
+                return;
+            }
+
+            let stats = { "มาเรียน": 0, "ไม่มาเรียน": 0, "ลา": 0 };
+            const uniqueDates = new Set();
+            studentRecords.forEach(r => {
+                stats[r.status]++;
+                uniqueDates.add(r.date);
+            });
+            
+            const totalAttendanceEntries = stats["มาเรียน"] + stats["ไม่มาเรียน"] + stats["ลา"];
+            const attendancePercentage = totalAttendanceEntries > 0 ? ((stats["มาเรียน"] / totalAttendanceEntries) * 100).toFixed(2) : "0.00";
+
+
+            contentHtml += `<div class="my-4 p-4 bg-blue-50 rounded-lg shadow">
+                                <h4 class="font-semibold text-blue-700">สรุป:</h4>
+                                <p>จำนวนวันที่มีการบันทึกข้อมูล: ${uniqueDates.size} วัน</p>
+                                <p class="text-green-700">มาเรียน: ${stats["มาเรียน"]} ครั้ง</p>
+                                <p class="text-red-700">ไม่มาเรียน: ${stats["ไม่มาเรียน"]} ครั้ง</p>
+                                <p class="text-yellow-700">ลา: ${stats["ลา"]} ครั้ง</p>
+                                <p><strong>เปอร์เซ็นต์การมาเรียน (จากจำนวนครั้งที่เช็ค): ${attendancePercentage}%</strong></p>
+                            </div>`;
+            
+            contentHtml += `<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="table-header">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">วันที่</th>
+                                        <th class="px-3 py-2 text-left">วิชา</th>
+                                        <th class="px-3 py-2 text-left">สถานะ</th>
+                                        <th class="px-3 py-2 text-left">หมายเหตุ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+            
+            studentRecords.forEach(record => {
+                let statusClass = '';
+                if (record.status === "มาเรียน") statusClass = 'text-green-600 font-semibold';
+                else if (record.status === "ไม่มาเรียน") statusClass = 'text-red-600 font-semibold';
+                else if (record.status === "ลา") statusClass = 'text-yellow-600 font-semibold';
+
+                contentHtml += `<tr>
+                                    <td class="px-3 py-2">${new Date(record.date).toLocaleDateString('th-TH')}</td>
+                                    <td class="px-3 py-2">${record.subject}</td>
+                                    <td class="px-3 py-2 ${statusClass}">${record.status}</td>
+                                    <td class="px-3 py-2">${record.notes || '-'}</td>
+                                  </tr>`;
+            });
+            contentHtml += `</tbody></table></div>`;
+            reportContent.innerHTML = contentHtml;
+        }
+
+        // --- Class Comparison Report Page ---
+        function generateClassComparisonReport() {
+            const gradeFilter = document.getElementById('ccGrade').value;
+            const startDate = document.getElementById('ccStartDate').value;
+            const endDate = document.getElementById('ccEndDate').value;
+
+            const reportDisplayArea = document.getElementById('classComparisonReportDisplayArea');
+            const reportHeader = document.getElementById('classComparisonReportHeader');
+            const tableContainer = document.getElementById('classComparisonTableContainer');
+            const chartContainer = document.getElementById('classComparisonChartContainer');
+            const chartCanvas = document.getElementById('classComparisonChart');
+
+            if (!reportDisplayArea || !reportHeader || !tableContainer || !chartContainer || !chartCanvas) {
+                console.error("Class comparison report elements missing.");
+                showModal("ข้อผิดพลาด: ไม่สามารถโหลดองค์ประกอบหน้ารายงานเปรียบเทียบได้");
+                return;
+            }
+            
+            reportDisplayArea.style.display = 'none'; 
+            reportHeader.innerHTML = '';
+            tableContainer.innerHTML = '';
+            chartContainer.style.display = 'none';
+            if (classComparisonChartInstance) {
+                classComparisonChartInstance.destroy();
+                classComparisonChartInstance = null;
+            }
+
+            let relevantRecords = [...attendanceRecords];
+            if (startDate) relevantRecords = relevantRecords.filter(r => r.date >= startDate);
+            if (endDate) relevantRecords = relevantRecords.filter(r => r.date <= endDate);
+
+            let classesToCompare = [];
+            const targetGrades = gradeFilter ? [gradeFilter] : grades;
+
+            targetGrades.forEach(g => {
+                classes.forEach(c => {
+                    if (students.some(s => s.grade === g && s.room === c)) {
+                        classesToCompare.push({ grade: g, room: c });
+                    }
+                });
+            });
+            classesToCompare.sort((a,b) => a.grade.localeCompare(b.grade) || parseInt(a.room) - parseInt(b.room));
+
+
+            let headerTextVal = `เปรียบเทียบเปอร์เซ็นต์การเข้าเรียน ${gradeFilter ? `ระดับชั้น ${gradeFilter}` : 'ทุกระดับชั้น'}`;
+            if (startDate || endDate) {
+                headerTextVal += `<br><span class="text-sm text-gray-600">ช่วงวันที่: ${startDate ? new Date(startDate).toLocaleDateString('th-TH') : 'เริ่มต้น'} - ${endDate ? new Date(endDate).toLocaleDateString('th-TH') : 'ปัจจุบัน'}</span>`;
+            }
+            reportHeader.innerHTML = headerTextVal;
+
+            if (classesToCompare.length === 0) {
+                tableContainer.innerHTML = '<p class="text-center text-gray-500">ไม่พบห้องเรียนสำหรับเปรียบเทียบ หรือไม่มีข้อมูลนักเรียนในระบบสำหรับตัวกรองนี้</p>';
+                reportDisplayArea.style.display = 'block';
+                return;
+            }
+            
+            let comparisonData = [];
+            classesToCompare.forEach(cls => {
+                const studentsInClass = students.filter(s => s.grade === cls.grade && s.room === cls.room);
+                const studentIdsInClass = studentsInClass.map(s => s.id);
+                
+                const recordsForClass = relevantRecords.filter(r => studentIdsInClass.includes(r.studentId));
+                
+                let present = 0;
+                let totalChecked = 0;
+                recordsForClass.forEach(r => {
+                    totalChecked++;
+                    if (r.status === "มาเรียน") present++;
+                });
+                
+                const attendancePercentage = totalChecked > 0 ? (present / totalChecked) * 100 : 0;
+                comparisonData.push({
+                    className: `${cls.grade}/${cls.room}`,
+                    totalStudents: studentsInClass.length,
+                    presentCount: present,
+                    totalChecked: totalChecked,
+                    percentage: attendancePercentage
+                });
+            });
+
+            let tableHtml = `<table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="table-header">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">ห้อง</th>
+                                        <th class="px-3 py-2 text-left">จำนวน นร.</th>
+                                        <th class="px-3 py-2 text-left">จำนวนครั้งที่เช็ค</th>
+                                        <th class="px-3 py-2 text-left">มาเรียน (ครั้ง)</th>
+                                        <th class="px-3 py-2 text-left">% การมาเรียน</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+            
+            comparisonData.forEach(data => {
+                tableHtml += `<tr>
+                                <td class="px-3 py-2">${data.className}</td>
+                                <td class="px-3 py-2">${data.totalStudents}</td>
+                                <td class="px-3 py-2">${data.totalChecked}</td>
+                                <td class="px-3 py-2">${data.presentCount}</td>
+                                <td class="px-3 py-2 font-semibold">${data.percentage.toFixed(2)}%</td>
+                              </tr>`;
+            });
+            tableHtml += `</tbody></table>`;
+            tableContainer.innerHTML = tableHtml;
+
+            chartContainer.style.display = 'flex';
+            const ctx = chartCanvas.getContext('2d');
+            classComparisonChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: comparisonData.map(d => d.className),
+                    datasets: [{
+                        label: '% การมาเรียน',
+                        data: comparisonData.map(d => d.percentage.toFixed(2)),
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)', 
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'เปอร์เซ็นต์การมาเรียน' }
+                        },
+                        x: {
+                             title: { display: true, text: 'ห้องเรียน' }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `เปอร์เซ็นต์การเข้าเรียนเฉลี่ยแต่ละห้อง ${gradeFilter ? `(ชั้น ${gradeFilter})` : ''}`
+                        }
+                    }
+                }
+            });
+            reportDisplayArea.style.display = 'block';
+        }
+
+
+        // --- Initialization ---
+        window.onload = () => {
+            updateCurrentDateTime();
+            populateAllCommonDropdowns();
+            document.getElementById('attDate').valueAsDate = new Date(); 
+            document.getElementById('drDate').valueAsDate = new Date(); 
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('irEndDate').value = today;
+            document.getElementById('ccEndDate').value = today;
+
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+            document.getElementById('irStartDate').value = oneMonthAgo.toISOString().split('T')[0];
+            document.getElementById('ccStartDate').value = oneMonthAgo.toISOString().split('T')[0];
+            
+            showPage('attendancePage'); 
+        };
+
+    </script>
+</body>
+</html>
